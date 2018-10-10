@@ -1,0 +1,305 @@
+---
+title: "hw04:Tidy data and joins"
+author: "Zuheng(David) Xu"
+date: '2018-10-09'
+output: 
+  github_document:
+  toc: yes
+      
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The aim of this assignment is to practice and solidify my data wrangling skills, like data aggregation and data reshaping. I chose `gapminder` as the dataset to practice the data reshaping prompts and join prompts. 
+
+```{r,message=FALSE}
+library(gapminder)
+library(tidyverse)
+library(ggplot2)
+library(knitr)
+```
+
+# Tasks
+## 1. Data Reshaping Prompts
+
+### 1.1 Activity #2
+
+In this section, I will make a tibble with one row per year and columns for life expectancy for countriy `China`,`Canada`, `United Kingdom`, `United States`, and use `knitr::kable()` fucntion to represent my results. Also, I will use scatterplot for visualization.
+
+First of all, I need filter the four country out and using `spread` function to reshape the dataset.
+
+```{r}
+#data set creating and reshape 
+country_life = gapminder %>% 
+  filter(country %in% c("China","Canada","United States","United Kingdom")) %>% 
+  select(country, year, lifeExp) %>% # filter the data
+  #reshape the data, putting country into 1 col
+  spread(key = country, value = lifeExp) 
+```
+
+Then using `kable` to generate a readable table.
+```{r}
+country_life %>% 
+  knitr::kable(caption = "Life Expectancy for Each Year",
+               col.names = c("Year", "Canada","China","UK","US"),
+               format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+Now I will choose `Canada` and `China` to make a scatter plot aganst each other. The package I will use is `ggplot2`.
+
+```{r}
+country_life %>% 
+  ggplot(aes(China , Canada)) +
+  geom_smooth() +
+  geom_point(aes(color = year)) +
+  theme_gray()+
+  labs(title = "Life Expectancy in China and Canada by year")
+
+```
+ 
+Obviously, the life expectancy changing by year of China is not consistent with which of Canada. Generally, Canada has higher life expectancy which increase averagely during these years, while China shows faster increase in life expectancy during 1960 to 1980 and then shows almost the same pace of increase.
+
+### 1.2 Activity #3
+
+In this section, I will use choose the median as the measure of life expectancy and group the data by continent and year.
+
+```{r}
+#using summarise to calculate median in each continent each year
+contyear_life_med = gapminder %>% 
+  group_by(continent , year) %>% 
+  summarise(Median_contyear = median(lifeExp)) %>% 
+  #reshape into a dataframe has a var fro each continent 
+  spread(key = continent, value = Median_contyear)
+
+#generate table
+contyear_life_med %>% 
+  knitr::kable(caption = 
+              "Median Life Expectancy for Each continent by year",
+               format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+To make plot by continent easier, it's better to filp the table by put continent as the first col name and each col for a year.
+
+```{r}
+# to put the year in cols
+yearcont_life_med = gapminder %>% 
+  group_by(continent , year) %>% 
+  summarise(Median_contyear = median(lifeExp)) %>% 
+  #reshape into a dataframe has vars of each year  
+  spread(key = year, value = Median_contyear) 
+  #generate table
+yearcont_life_med %>% 
+  knitr::kable(caption = 
+              "Median Life Expectancy for Each continent by year",
+               format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+
+```
+
+However, both the two tidy data above is not suitable for giving a plot containing all information of year and country. If we want to do so,
+it's better to gather the data back. 
+
+```{r}
+contyear_life_med %>% 
+  gather(key = "continent", value = "lifeExp",   Africa,Asia,Americas,Europe,Oceania) %>% 
+    ggplot(aes(year,lifeExp,color= continent)) +
+  geom_smooth(se =FALSE,size=1)+
+  geom_point()+
+  theme_gray()
+```
+
+
+## 2. Join Prompts(Activity #1)
+In this part, I will use the dataset built in package `wbstat`, which is a global socio-economic data, to explore the `join` funciton. The link of this data [is here](https://cran.r-project.org/web/packages/wbstats/vignettes/Using_the_wbstats_package.html)
+
+To make things eaiser, I will only choose a part of the `gapminder`. I will fix the year in 2002, then select `country`,`continent`,`pop`,`gdpPercap` from `gapminder`.
+
+```{r}
+gap = filter(gapminder, year == "2002") %>% 
+  select(country, continent, pop, gdpPercap) %>% 
+  drop_na()
+
+# see the samples of this data
+gap %>% head() %>% 
+  knitr::kable(caption = "Samples of partial gapminder",
+               format = "markdown",
+               booktabs = TRUE,
+               padding = 2)
+```
+
+
+### 2.1 Creating complementary data
+
+```{r,message=FALSE}
+library(wbstats)
+#finding available data with wb_cachelist
+str(wb_cachelist$countries,max.level = 1)
+#creating new dataset
+new_data = wb_cachelist$countries %>% 
+  select(country,income,region) %>% 
+  drop_na()#drop all the NA
+
+#to see some samples in table
+head(new_data) %>% 
+  knitr::kable(caption = 
+              "Samples of compelementary data",
+               format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+Before exploring the `join` funciton, I am going to see the overlaps of `country` between `gap` and `new_data`.
+
+```{r}
+# to see how many overlaps of country 
+gap$country %in% new_data$country %>% 
+  sum()
+```
+
+As shown in the output, there are 133 countries being in both 2 datasets, which may suffice to finish the task.
+
+### 2.2 `full_join`
+
+Let's try `full_join` here.
+
+```{r}
+# full_join
+f_join = full_join(gap, new_data, by = "country")
+
+# To see samples after full_join
+head(f_join,10) %>% 
+   knitr::kable(format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+I am going to check the dimension of `f_join` and compare to `gap` & `new_data`
+
+```{r}
+# dimension of f_join
+(dim_f = dim(f_join)) 
+# dim of gap
+dim(gap)
+#dim of new_data
+dim(new_data)
+# to see how many overlaps of country 
+gap$country %in% new_data$country %>% 
+  sum()
+```
+
+We can see that `full_join` keeps both 2 dataset and merge them together, while `left_join` and `right_join` only keep single side untouched and merge another to it, as we can see soon.
+
+### 2.3 `left_join` and `right_join`
+
+```{r}
+#left_join
+l_join = left_join(gap, new_data, by = "country")
+#generate tables
+head(l_join,10) %>% 
+   knitr::kable(format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+#right_join
+r_join = right_join(gap, new_data, by = "country")
+#generate tables
+head(r_join,10) %>% 
+   knitr::kable(format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+Notice, if we change the order of those two dataset when conducting single sided join, will make `left_join` to `right_join` and vise versa.
+
+### 2.4 `inner_join`
+
+While former two types of `join` makes one table merges into another, `inner_join` only keeps the same observations, which sounds like finding intersects and will not generate "NA" entries.
+
+```{r}
+#inner_join
+in_join = inner_join(gap, new_data, by = "country")
+#generate table
+head(in_join,10) %>% 
+   knitr::kable(format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+
+```
+
+Here if we change the order of those two tables, the only difference is that the order of columns changes.
+
+### 2.5 Filtering join
+
+#### `semi_join`
+
+```{r}
+#semi_join
+s_join = semi_join(gap, new_data, by = "country")
+#generate table
+head(s_join,10) %>% 
+   knitr::kable(format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+A `semi_join` differs from an `inner_join` because an inner join will return one row of x for each matching row of y, where a semi join will never duplicate rows of y. Therefore we can see that there are only 4 cols in the table.
+
+#### `anti_join`
+
+The `anti_join` only returns the elements that cannot be `semi_join`.
+
+
+```{r}
+#anti_join
+a_join = anti_join(gap, new_data, by = "country")
+#generate table
+head(a_join,10) %>% 
+   knitr::kable(format = "markdown",
+               booktabs = TRUE,
+               padding = 0)
+```
+
+### Dimension comparison
+
+In this section, I will put the dimension of all those joins results into a table, which makes the property of each join more readable.
+
+```{r}
+# dim of gap
+dim_gap = dim(gap)
+#dim of new_data
+dim_data = dim(new_data)
+# dimension of f_join
+dim_f = dim(f_join) 
+#dim of l_join
+dim_l = dim(l_join)
+#dim of r_join
+dim_r = dim(r_join)
+#dim of in_join
+dim_in = dim(in_join)
+#dim of semi_join
+dim_s = dim(s_join)
+#dim of l_join
+dim_a = dim(a_join)
+
+data.frame(dim_gap,dim_data,dim_f,dim_l,dim_r,dim_in,dim_s,dim_a) %>% 
+  knitr::kable(col.names = c("x","y","full","left","right","inner","semi","anti"),
+    caption = "Dimension caparison",
+    add.row.names = c("data","nrows","ncols"),
+               format = "markdown")
+
+```
+
+
+
+# Referecnces
+1. [complementary data in  `wbstats`](https://cran.r-project.org/web/packages/wbstats/vignettes/Using_the_wbstats_package.html)
+
+2. [Table settings](https://rmarkdown.rstudio.com/lesson-7.html)
