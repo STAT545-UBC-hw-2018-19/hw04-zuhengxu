@@ -248,8 +248,10 @@ yearcont_life_med %>%
 However, both the two tidy data above is not suitable for giving a plot containing all information of year and country. If we want to do so, it's better to gather the data back.
 
 ``` r
+# gathering data by continent
 contyear_life_med %>% 
   gather(key = "continent", value = "lifeExp",   Africa,Asia,Americas,Europe,Oceania) %>% 
+  #scatter and line plot
     ggplot(aes(year,lifeExp,color= continent)) +
   geom_smooth(se =FALSE,size=1)+
   geom_point()+
@@ -964,7 +966,7 @@ dim_in = dim(in_join)
 dim_s = dim(s_join)
 #dim of l_join
 dim_a = dim(a_join)
-
+# put them in a table
 data.frame(dim_gap,dim_data,dim_f,dim_l,dim_r,dim_in,dim_s,dim_a) %>% 
   knitr::kable(col.names = c("x","y","full","left","right","inner","semi","anti"),
     caption = "Dimension caparison",
